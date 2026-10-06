@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>For My Sis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="background"><div class="background-glow glow-1"></div><div class="background-glow glow-2"></div><div class="noise"></div></div>
+  <canvas id="rainCanvas"></canvas>
+  <div id="mouseGlow"></div>
+
+  <section id="startScreen" class="start-screen">
+    <div id="rainWindow" class="rain-window">
+      <div class="glass-reflection"></div><div id="glassDrops"></div>
+      <div class="corner corner-top-left">FOR MY SIS</div><div class="corner corner-top-right">06 // 10 // 2026</div>
+      <div class="intro-content">
+        <div class="eyebrow"><span class="eyebrow-dot"></span><span>PRIVATE TRANSMISSION</span></div>
+        <h1>Đôi lời muốn nói<span>an ủi thôi nhá</span></h1>
+        <div class="divider"><span></span><i class="diamond"></i><span></span></div>
+        <p class="intro-message">Nghe cái này cho <strong>đỡ buồn</strong> này</p>
+        <p class="intro-sub">Có thằng đệ ngồi code cái này hơi lâu đấy.</p>
+        <div class="headphone-note"><div class="headphone-icon">♫</div><div><small>RECOMMENDED</small><span>Đeo tai nghe vào nhá</span></div></div>
+        <button id="startBtn" class="start-button" type="button"><span class="button-background"></span><span class="button-text">NGHE THỬ</span><span class="button-arrow">→</span></button>
+      </div>
+      <div class="window-bottom"><span>RAIN // HEART // 3D</span><div class="bottom-line"></div><span>FOR ONE PERSON ONLY</span></div>
+    </div>
+  </section>
+
+  <section id="lyricScreen" class="lyric-screen hidden"><div class="lyric-top"><span class="playing-dot"></span> NOW PLAYING // SHAPE OF YOU</div><div class="lyric-footer"><span>FOR MY SIS</span><span>DON'T BE SAD.</span></div></section>
+  <canvas id="heartCanvas"></canvas>
+  <div id="messageLayer"></div>
+  <audio id="music" preload="auto" src="music.mp3"></audio>
+  <script src="script.js"></script>
+</body>
+</html>
