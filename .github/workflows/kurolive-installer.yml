@@ -41,10 +41,10 @@ jobs:
       - name: Apply approved KuroLive logo
         shell: pwsh
         run: |
-          $parts = Get-ChildItem 'kurolive_brand\approved_logo_*.b64' | Sort-Object Name
+          $parts = Get-ChildItem '..\kurolive_brand\approved_logo_*.b64' | Sort-Object Name
           if ($parts.Count -ne 2) { throw "Expected 2 approved logo parts, found $($parts.Count)" }
           $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
-          [IO.File]::WriteAllBytes('kurolive_build\KuroLive_logo.png', [Convert]::FromBase64String($b64))
+          [IO.File]::WriteAllBytes('KuroLive_logo.png', [Convert]::FromBase64String($b64))
 
           @'
           from PIL import Image
