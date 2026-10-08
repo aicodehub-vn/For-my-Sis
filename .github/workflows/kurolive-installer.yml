@@ -1,0 +1,84 @@
+name: Build KuroLive Windows Installer
+
+on:
+  push:
+    branches: [kurolive-build-v32]
+    paths:
+      - 'kurolive_payload/**'
+      - '.github/workflows/kurolive-installer.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct KuroLive source
+        shell: pwsh
+        run: |
+          $parts = Get-ChildItem 'kurolive_payload\part*.b64' | Sort-Object Name
+          if ($parts.Count -ne 7) { throw "Expected 7 payload parts, found $($parts.Count)" }
+          $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
+          [IO.File]::WriteAllBytes('kurolive_build_src.zip', [Convert]::FromBase64String($b64))
+          New-Item -ItemType Directory -Force -Path 'kurolive_build' | Out-Null
+          Expand-Archive 'kurolive_build_src.zip' -DestinationPath 'kurolive_build' -Force
+          if (-not (Test-Path 'kurolive_build\main.py')) { throw 'Source reconstruction failed' }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: 'x64'
+
+      - name: Install build dependencies
+        shell: pwsh
+        working-directory: kurolive_build
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install pyinstaller PySide6 live2d-py opencv-python numpy
+
+      - name: Build KuroLive application
+        shell: pwsh
+        working-directory: kurolive_build
+        run: |
+          pyinstaller --noconfirm --clean KuroLive.spec
+          if (-not (Test-Path 'dist\KuroLive\KuroLive.exe')) { throw 'KuroLive.exe was not created' }
+
+      - name: Download OpenSeeFace v1.20.5
+        shell: pwsh
+        working-directory: kurolive_build
+        run: |
+          $url = 'https://github.com/emilianavt/OpenSeeFace/releases/download/v1.20.5/OpenSeeFace-v1.20.5.zip'
+          Invoke-WebRequest -Uri $url -OutFile osf.zip
+          Expand-Archive osf.zip -DestinationPath osf_unpack -Force
+          $ft = Get-ChildItem osf_unpack -Recurse -Filter facetracker.exe | Select-Object -First 1
+          if (-not $ft) { throw 'facetracker.exe not found in OpenSeeFace archive' }
+          New-Item -ItemType Directory -Force -Path 'dist\KuroLive\OpenSeeFace' | Out-Null
+          Copy-Item $ft.Directory.FullName -Destination 'dist\KuroLive\OpenSeeFace\Binary' -Recurse -Force
+          if (-not (Test-Path 'dist\KuroLive\OpenSeeFace\Binary\facetracker.exe')) { throw 'OpenSeeFace copy failed' }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+          }
+          if (-not (Test-Path $iscc)) { throw 'ISCC.exe not found' }
+
+      - name: Build one-file installer
+        shell: pwsh
+        working-directory: kurolive_build
+        run: |
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' KuroLive.iss
+          if (-not (Test-Path 'release\KuroLive_Setup.exe')) { throw 'Installer was not created' }
+          Get-FileHash 'release\KuroLive_Setup.exe' -Algorithm SHA256 | Format-List
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KuroLive_Setup_V32
+          path: kurolive_build/release/KuroLive_Setup.exe
+          if-no-files-found: error
+          compression-level: 0
