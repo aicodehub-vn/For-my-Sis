@@ -38,36 +38,84 @@ jobs:
           python -m pip install --upgrade pip wheel setuptools
           python -m pip install pyinstaller PySide6 live2d-py opencv-python numpy pillow
 
-      - name: Apply approved KuroLive logo
+      - name: Build approved KuroLive logo
         shell: pwsh
+        working-directory: kurolive_build
         run: |
-          $parts = Get-ChildItem '..\kurolive_brand\approved_logo_*.b64' | Sort-Object Name
-          if ($parts.Count -ne 2) { throw "Expected 2 approved logo parts, found $($parts.Count)" }
-          $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ''
-          [IO.File]::WriteAllBytes('KuroLive_logo.png', [Convert]::FromBase64String($b64))
-
           @'
-          from PIL import Image
+          from PIL import Image, ImageDraw, ImageFont, ImageFilter
           from pathlib import Path
+          import os, math
 
-          img = Image.open("KuroLive_logo.png").convert("RGBA")
+          S = 512
+          img = Image.new("RGBA", (S,S), (0,0,0,0))
+
+          # Polished violet rounded-square app tile.
+          tile = Image.new("RGBA", (S,S), (0,0,0,0))
+          px = tile.load()
+          for y in range(S):
+              for x in range(S):
+                  # soft purple gradient with slight center glow
+                  t = y / (S-1)
+                  r = int(107 + 20*(1-t))
+                  g = int(72 + 18*(1-t))
+                  b = int(238 + 12*(1-t))
+                  glow = max(0.0, 1.0 - math.hypot(x-S*.48, y-S*.42)/(S*.72))
+                  px[x,y] = (min(255,int(r+12*glow)), min(255,int(g+8*glow)), min(255,int(b+10*glow)), 255)
+
+          mask = Image.new("L",(S,S),0)
+          md = ImageDraw.Draw(mask)
+          md.rounded_rectangle((18,18,494,494), radius=106, fill=255)
+          tile.putalpha(mask)
+
+          # subtle outer glow
+          glow = mask.filter(ImageFilter.GaussianBlur(18))
+          gl = Image.new("RGBA",(S,S),(85,45,255,0))
+          gl.putalpha(glow.point(lambda p:int(p*.45)))
+          img.alpha_composite(gl)
+          img.alpha_composite(tile)
+
+          d = ImageDraw.Draw(img)
+          d.rounded_rectangle((45,45,467,467), radius=82, outline=(205,190,255,105), width=4)
+
+          fonts=[r"C:\Windows\Fonts\segoeuib.ttf", r"C:\Windows\Fonts\arialbd.ttf"]
+          fp=next((p for p in fonts if os.path.exists(p)), None)
+          font=ImageFont.truetype(fp, 292) if fp else ImageFont.load_default()
+
+          bbox=d.textbbox((0,0),"K",font=font)
+          tw,th=bbox[2]-bbox[0],bbox[3]-bbox[1]
+          x=(S-tw)//2-9
+          y=(S-th)//2-34
+
+          # balanced shadow and centered white K
+          d.text((x+11,y+14),"K",font=font,fill=(29,18,91,145))
+          d.text((x,y),"K",font=font,fill=(255,255,255,255))
+
+          # live indicator at lower-right, optically balanced
+          cx,cy,rad=405,397,23
+          d.ellipse((cx-rad-3,cy-rad-3,cx+rad+3,cy+rad+3),fill=(255,255,255,245))
+          d.ellipse((cx-rad+3,cy-rad+3,cx+rad-3,cy+rad-3),fill=(55,238,171,255))
+
+          img.save("KuroLive_logo.png")
           img.save("KuroLive.ico", format="ICO",
                    sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
 
-          spec = Path("KuroLive.spec")
-          text = spec.read_text(encoding="utf-8")
+          spec=Path("KuroLive.spec")
+          text=spec.read_text(encoding="utf-8")
           if "icon='KuroLive.ico'" not in text:
-              text = text.replace("name='KuroLive',\n    debug=False,",
-                                  "name='KuroLive',\n    icon='KuroLive.ico',\n    debug=False,")
-          spec.write_text(text, encoding="utf-8")
+              text=text.replace("name='KuroLive',\n    debug=False,",
+                                "name='KuroLive',\n    icon='KuroLive.ico',\n    debug=False,")
+          spec.write_text(text,encoding="utf-8")
 
-          iss = Path("KuroLive.iss")
-          text = iss.read_text(encoding="utf-8")
+          iss=Path("KuroLive.iss")
+          text=iss.read_text(encoding="utf-8")
           if "SetupIconFile=KuroLive.ico" not in text:
-              text = text.replace("SetupLogging=yes", "SetupLogging=yes\nSetupIconFile=KuroLive.ico")
-          iss.write_text(text, encoding="utf-8")
+              text=text.replace("SetupLogging=yes","SetupLogging=yes\nSetupIconFile=KuroLive.ico")
+          iss.write_text(text,encoding="utf-8")
           '@ | python
-        working-directory: kurolive_build
+
+          if (-not (Test-Path 'KuroLive.ico')) { throw 'KuroLive.ico was not created' }
+          if (-not (Test-Path 'KuroLive_logo.png')) { throw 'KuroLive_logo.png was not created' }
 
       - name: Build KuroLive application
         shell: pwsh
